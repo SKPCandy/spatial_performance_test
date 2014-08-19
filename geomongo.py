@@ -1,11 +1,13 @@
 #!/usr/bin/env python
-"test mongodb"
+"""MongoDB Performance Test"""
+
 import time
 import pymongo
+import sys
 
-if __name__ == "__main__":
-    client = pymongo.MongoClient('localhost', 27017)
-    db = client.geodb
+
+def select(client):
+    num = 100000
 
     query = {
         "loc": {
@@ -16,15 +18,23 @@ if __name__ == "__main__":
         }
     }
 
-    start = time.time()
-
-    for i in range(100000):
+    db = client.geodb
+    for i in range(num):
         posts = db.test.find(query)
         #print posts.count()
         for post in posts:
             pass
         #print post
 
-    end = time.time()
-    execution_time = (end - start) # Convert to ms
-    print execution_time
+def execute(func, client):
+    start = time.time()
+    func(client)
+    stop = time.time()
+    print "%s: %s" % (func.func_name, stop - start)
+
+def main(argv):
+    client = pymongo.MongoClient('localhost', 27017)
+    execute(select, client)
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

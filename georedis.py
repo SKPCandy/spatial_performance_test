@@ -1,8 +1,15 @@
 #!/usr/bin/env python
-"""geo command client"""
+"""Redis Performance Test
+
+Options:
+    -i  insert
+    -s  select
+"""
 import socket
 import time
 import redis
+import sys
+import getopt
 
 # pylint: disable=C0103
 # pylint: disable=C0111
@@ -24,7 +31,6 @@ class GRedis(object):
 
         fp = self.sock.makefile('r')
         packet = fp.readline()
-
         return packet
 
     def georadius(self, geoset, x, y, radius):
@@ -38,45 +44,73 @@ class GRedis(object):
         for i in xrange(num):
             length = fp.readline()
             value = fp.readline()
-
         return num
 
-if __name__ == "__main__":
-    host = "localhost"
-    port = 6379
 
-    unit = 0.001
+def insert(client):
     num = 1000
+    unit = 0.001
     member = 0
 
-    client = GRedis(host, port)
-    client.connect()
+    for i in range(num):
+        for j in range(num):
+            x = i * unit
+            y = j * unit
+            client.geoadd("test", str(member), x, y)
+            member += 1
 
-
-    # insert
-#    r = redis.StrictRedis(host='localhost', port=int(port))
-#    r.delete("test")
-#
-#    start = time.time()
-#    for i in range(num):
-#        for j in range(num):
-#            x = i * unit
-#            y = j * unit
-#            client.geoadd("test", str(member), x, y)
-#            member += 1
-#
-#    end = time.time()
-#    execute_time = (end - start)
-#    print "insert time(%s): %s" % (num*num, execute_time)
-
-    # search
-    start = time.time()
-
-    for i in range(100000):
+def select(client):
+    num = 100000
+    for i in range(num):
         ret = client.georadius("test", 0.1, 0.1, 100)
         if ret != 1:
             print "error"
 
-    end = time.time()
-    execute_time = (end - start)
-    print "search time: %s" % execute_time
+def execute(func, client):
+    start = time.time()
+    func(client)
+    stop = time.time()
+    print "%s: %s" % (func.func_name, stop - start)
+
+def usage():
+    print __doc__
+
+def main(argv):
+    host = "localhost"
+    port = 6379
+
+    # parse options
+    insert_test = False
+    search_test = False
+
+    if not len(argv):
+        usage()
+        sys.exit(1)
+
+    try:
+        opts, args = getopt.getopt(argv, "is")
+    except getopt.GetoptError:
+        usage()
+        sys.exit(1)
+
+    for opt, arg in opts:
+        if opt == "-i":
+            insert_test = True
+        elif opt == "-s":
+            search_test = True
+
+    # execute test
+    r = redis.StrictRedis(host=host, port=int(port))
+    r.delete("test")
+
+    client = GRedis(host, port)
+    client.connect()
+
+    if insert_test:
+        execute(insert, client)
+
+    if search_test:
+        execute(select, client)
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

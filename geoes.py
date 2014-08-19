@@ -1,12 +1,22 @@
 #!/usr/bin/env python
+"""Elasticsearch Performance Test
+
+Options:
+    -i  insert
+    -s  search
+"""
 
 import time
-import json
+import sys
+import getopt
 from elasticsearch import Elasticsearch
 
+# pylint: disable=C0111
+# pylint: disable=C0103
+
 def insert(es):
+    num = 1000 # total num = num * num
     unit = 0.001
-    num = 1000
     member = 0
 
     for i in xrange(num):
@@ -23,6 +33,8 @@ def insert(es):
             member += 1
 
 def select(es):
+    num = 10
+
     doc = {
         "query": {
             "filtered" : {
@@ -42,17 +54,47 @@ def select(es):
         }
     }
 
-    for i in xrange(100000):
+    for i in xrange(num):
         es.search(index="test_index", doc_type="poi", body=doc)
 
-
-def execute(f, es):
+def execute(func, es):
     start = time.time()
-    f(es)
+    func(es)
     stop = time.time()
-    print "%s: %s" % (f.func_name, stop - start)
+    print "%s: %s" % (func.func_name, stop - start)
+
+def usage():
+    print __doc__
+
+def main(argv):
+    # parse options
+    insert_test = False
+    search_test = False
+
+    if len(argv) == 0:
+        usage()
+        sys.exit()
+
+    try:
+        opts, args = getopt.getopt(argv, "is")
+    except getopt.GetoptError:
+        usage()
+        sys.exit(2)
+
+    for opt, arg in opts:
+        if opt == "-i":
+            insert_test = True
+        elif opt == "-s":
+            search_test = True
+
+    # execute test
+    es = Elasticsearch(hosts=["10.202.67.200:9200"])
+
+    if insert_test:
+        execute(insert, es)
+
+    if search_test:
+        execute(select, es)
 
 if __name__ == "__main__":
-    es = Elasticsearch(hosts=["10.202.67.200:9200"])
-    execute(insert, es)
-    #execute(select, es)
+    main(sys.argv[1:])

@@ -1,8 +1,15 @@
 #!/usr/bin/env python
-"test postgres"
+"""Postgres Performance Test
+
+Options:
+    -i  insert
+    -s  search
+"""
 
 import psycopg2
 import time
+import sys
+import getopt
 
 # pylint: disable=C0111
 
@@ -19,8 +26,8 @@ def create_table(conn):
     cur.close()
 
 def insert(conn):
-    unit = 0.001
     num = 1000
+    unit = 0.001
     member = 0
 
     cur = conn.cursor()
@@ -32,34 +39,62 @@ def insert(conn):
             cur.execute(stmts)
             member += 1
     cur.close()
-
     conn.commit()
 
 def select(conn):
+    num = 100000
+
     cur = conn.cursor()
-    for i in xrange(100000):
+    for i in xrange(num):
         cur.execute(
             "select id, st_astext(geom) from geotest where st_dwithin(geom, 'point(0.1 0.1)', 0.0001);")
         for record in cur:
             pass
-#            print record
     cur.close()
 
-def execute(f, conn):
+def execute(func, conn):
     start = time.time()
-    f(conn)
+    func(conn)
     stop = time.time()
-    print "%s: %s" % (f.func_name, stop - start)
+    print "%s: %s" % (func.func_name, stop - start)
 
-def main():
+def usage():
+    print __doc__
+
+def main(argv):
+    insert_test = False
+    search_test = False
+
+    # parse options
+    if not len(argv):
+        usage()
+        sys.exit(1)
+
+    try:
+        opts, args = getopt.getopt(argv, "is")
+    except getopt.GetoptError:
+        usage()
+        sys.exit(1)
+
+    for opt, arg in opts:
+        if opt == "-i":
+            insert_test = True
+        elif opt == "-s":
+            search_test = True
+
+    # execute test
     conn = psycopg2.connect(host="127.0.0.1", dbname="test", user="lordsday")
 
-    execute(drop_table, conn)
-    execute(create_table, conn)
-    execute(insert, conn)
-    #execute(select, conn)
+    drop_table(conn)
+    create_table(conn)
+
+    if insert_test:
+        execute(insert, conn)
+
+    if search_test:
+        execute(select, conn)
 
     conn.close()
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
